@@ -6,35 +6,41 @@ DECLARE
   geom_end_point_state boolean;
   geom_start_point_state_house boolean;
   geom_end_point_state_house boolean;
-BEGIN 
+  BEGIN 
   IF  TG_OP = 'INSERT' THEN  
 -----ниже моя вставка для упрощённого подхода к рисованию(можно вносить кол-во волокон и/или длина и/или тип кабеля/добавить)
 -- тут есть некий дисонанс: если мы пытаемя обновить поля в слое "для рисования" система не даёт их перезаписать и в слоях кабели_ВКП_для_рисования и в кабели_ВКП будут разные данные - это будет вносить сумятицу: в связи с чем есть идея: затирать данные в таблице кабели_ВКП_для_рисования (добавил ниже)
---для окончательной реализации нужно во все таблицы типа _cable_air_cable_geom  поле cable_description и заменить в скриптах ниже cable_type  на cable_description !!! 
+--все таблицы типа _cable_air_cable_geom  поле cable_description и заменить в скриптах ниже cable_description  на cable_description !(сделано)
+-- нужно ещё будет подумать об исключениях RAISE EXCEPTION https://stackoverflow.com/questions/42890652/update-a-column-in-a-function-using-plpgsql
+-- добавить во все таблицы _cable_air   в поле cable_type значение по умолчанию 'optic' !!!
 
-        EXECUTE 'UPDATE '||city||'.'||city||'_cable_air
+
+            EXECUTE 'UPDATE '||city||'.'||city||'_cable_air
             SET
               cable_short_type_description = '||city||'_cable_air_cable_geom.cable_short_type_description
             FROM '||city||'.'||city||'_cable_air_cable_geom
             WHERE  '||city||'_cable_air.table_id = '||city||'_cable_air_cable_geom.table_id and '||city||'_cable_air.cable_short_type_description is NULL;
             UPDATE '||city||'.'||city||'_cable_air
             SET
-              cable_type = '||city||'_cable_air_cable_geom.cable_type
+              cable_description = '||city||'_cable_air_cable_geom.cable_description
             FROM '||city||'.'||city||'_cable_air_cable_geom
-            WHERE  '||city||'_cable_air.table_id = '||city||'_cable_air_cable_geom.table_id and '||city||'_cable_air.cable_type is NULL; 
+            WHERE  '||city||'_cable_air.table_id = '||city||'_cable_air_cable_geom.table_id and '||city||'_cable_air.cable_description is NULL; 
             UPDATE '||city||'.'||city||'_cable_air
             SET
               total_cable_length='||city||'_cable_air_cable_geom.total_cable_length
             FROM '||city||'.'||city||'_cable_air_cable_geom
-            WHERE  '||city||'_cable_air.table_id = '||city||'_cable_air_cable_geom.table_id and '||city||'_cable_air.total_cable_length is NULL' 
-        USING NEW;
+            WHERE  '||city||'_cable_air.table_id = '||city||'_cable_air_cable_geom.table_id and '||city||'_cable_air.total_cable_length is NULL;
+            UPDATE '||city||'.'||city||'_cable_air
+            SET
+              cable_type=DEFAULT
+            WHERE  '||city||'_cable_air.cable_type is NULL and '||city||'_cable_air.cable_short_type_description is NOT NULL;'         USING NEW;
          EXECUTE 'UPDATE '||city||'.'||city||'_cable_air_cable_geom
             SET
               cable_short_type_description = NULL,
-              cable_type = NULL,
+              cable_description = NULL,
               total_cable_length = NULL
                         
-            WHERE  '||city||'_cable_air_cable_geom.cable_short_type_description is NOT NULL OR '||city||'_cable_air_cable_geom.cable_type is NOT NULL OR '||city||'_cable_air_cable_geom.total_cable_length is NOT NULL' USING NEW; /* затираем данные после сохранения вроде работает норм*/
+            WHERE  '||city||'_cable_air_cable_geom.cable_short_type_description is NOT NULL OR '||city||'_cable_air_cable_geom.cable_description is NOT NULL OR '||city||'_cable_air_cable_geom.total_cable_length is NOT NULL' USING NEW; /* затираем данные после сохранения вроде работает норм*/
         
 ----------------
 ---------ниже  вставка  привязки домов к концам кабеля  (подъезды обновляем отдельно)----------------
@@ -141,22 +147,25 @@ BEGIN
             WHERE  '||city||'_cable_air.table_id = '||city||'_cable_air_cable_geom.table_id and '||city||'_cable_air.cable_short_type_description is NULL;
             UPDATE '||city||'.'||city||'_cable_air
             SET
-              cable_type = '||city||'_cable_air_cable_geom.cable_type
+              cable_description = '||city||'_cable_air_cable_geom.cable_description
             FROM '||city||'.'||city||'_cable_air_cable_geom
-            WHERE  '||city||'_cable_air.table_id = '||city||'_cable_air_cable_geom.table_id and '||city||'_cable_air.cable_type is NULL; 
+            WHERE  '||city||'_cable_air.table_id = '||city||'_cable_air_cable_geom.table_id and '||city||'_cable_air.cable_description is NULL; 
             UPDATE '||city||'.'||city||'_cable_air
             SET
               total_cable_length='||city||'_cable_air_cable_geom.total_cable_length
             FROM '||city||'.'||city||'_cable_air_cable_geom
-            WHERE  '||city||'_cable_air.table_id = '||city||'_cable_air_cable_geom.table_id and '||city||'_cable_air.total_cable_length is NULL' 
-        USING NEW;
+            WHERE  '||city||'_cable_air.table_id = '||city||'_cable_air_cable_geom.table_id and '||city||'_cable_air.total_cable_length is NULL; 
+            UPDATE '||city||'.'||city||'_cable_air
+            SET
+              cable_type=DEFAULT
+            WHERE  '||city||'_cable_air.cable_type is NULL and '||city||'_cable_air.cable_short_type_description is NOT NULL;'        USING NEW;
             EXECUTE 'UPDATE '||city||'.'||city||'_cable_air_cable_geom
             SET
               cable_short_type_description = NULL,
-              cable_type = NULL,
+              cable_description = NULL,
               total_cable_length = NULL
                         
-            WHERE  '||city||'_cable_air_cable_geom.cable_short_type_description is NOT NULL OR '||city||'_cable_air_cable_geom.cable_type is NOT NULL OR '||city||'_cable_air_cable_geom.total_cable_length is NOT NULL' USING NEW; /*  затераем данные в cable_air_cable_geom после сохранения вроде работает норм*/
+            WHERE  '||city||'_cable_air_cable_geom.cable_short_type_description is NOT NULL OR '||city||'_cable_air_cable_geom.cable_description is NOT NULL OR '||city||'_cable_air_cable_geom.total_cable_length is NOT NULL' USING NEW; /*  затераем данные в cable_air_cable_geom после сохранения вроде работает норм*/
        
 ------------------------------
 ---------ниже  вставка  привязки домов к концам кабеля  (подъезды обновляем отдельно)---------------
